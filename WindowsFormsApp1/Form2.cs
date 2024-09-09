@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 
@@ -11,6 +12,8 @@ namespace WindowsFormsApp1
         private int row = 7;
         private int col = 7;
         private int minesNumber = 10;
+        private int buttonSize = 50; // 按鈕的大小
+        private int padding = 5; // 按鈕之間的間距
 
         public Form2()
         {
@@ -21,17 +24,74 @@ namespace WindowsFormsApp1
         {
             // 初始化地雷盤
             board = InitializeBoard(row, col, minesNumber);
-            for (int i = 0; i < 7; i++)
+            Panel panel = new Panel
             {
-                for (int j = 0; j < 7; j++)
+                Dock = DockStyle.Fill,
+                AutoScroll = true // 如果按鈕數量超過 Panel 大小，啟用滾動條
+            };
+            this.Controls.Add(panel);
+
+            // 創建按鈕網格
+            CreateButtonGrid(panel,board);
+        }
+        private void CreateButtonGrid(Panel panel,int[,] board)
+        {
+            for (int i = 0; i < row; i++)
+            {
+                for (int j = 0; j < col; j++)
                 {
-                    Console.Write(board[i, j]);
+                    Button button = new Button
+                    {
+                        Size = new System.Drawing.Size(buttonSize, buttonSize),
+                        Location = new System.Drawing.Point(j * (buttonSize + padding), i * (buttonSize + padding)),
+                        Tag = new { Row = i, Col = j, minenumber=board[i, j] ,flag=0} // 存儲行列信息
+                    };
+
+                    // 註冊點擊事件處理程序
+                    button.MouseClick += Button_Click;
+                    panel.Controls.Add(button);
                 }
-                Console.WriteLine();
             }
         }
 
-        private int[,] InitializeBoard(int row, int col, int minesNumber)
+        // 按鈕點擊事件處理程序
+        private void Button_Click(object sender, MouseEventArgs e)
+        {
+            Button button = sender as Button; // 確保 sender 是 Button 類型
+            var tag = (dynamic)button.Tag;
+            if (button != null && ((dynamic)button.Tag).flag == 0)
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    if (tag.minenumber == 9)
+                    {
+                        MessageBox.Show($"game over");
+                    }
+                    else
+                    {
+                        button.Text = $"{tag.minenumber}";
+                        button.Font = new Font(button.Font.FontFamily, 16, FontStyle.Bold);
+                        button.ForeColor = Color.Red;
+                        button.Enabled = false;
+                    }
+                }
+                else if (e.Button == MouseButtons.Right)
+                {
+                    if (button.Text== "🚩")
+                    {
+                        button.Text = " ";
+                        ((dynamic)button.Tag).flag = 0;
+                    }
+                    else if (button.Text == "")
+                    {
+                        button.Text = "🚩";
+                        ((dynamic)button.Tag).flag = 1;
+                    }
+                }
+            }
+        }
+
+    private int[,] InitializeBoard(int row, int col, int minesNumber)
         {
             List<int> mines = GetRandomNumbers(row * col, minesNumber);
             int[,] board = new int[row, col];
