@@ -12,8 +12,8 @@ namespace WindowsFormsApp1
         private int row = 7;
         private int col = 7;
         private int minesNumber = 10;
-        private int buttonSize = 50; // 按鈕的大小
-        private int padding = 5; // 按鈕之間的間距
+        private int buttonSize = 50; 
+        private int padding = 5; 
 
         public Form2()
         {
@@ -22,19 +22,17 @@ namespace WindowsFormsApp1
 
         private void Form2_Load(object sender, EventArgs e)
         {
-            // 初始化地雷盤
-            board = InitializeBoard(row, col, minesNumber);
-            Panel panel = new Panel
-            {
-                Dock = DockStyle.Fill,
-                AutoScroll = true // 如果按鈕數量超過 Panel 大小，啟用滾動條
-            };
-            this.Controls.Add(panel);
 
-            // 創建按鈕網格
-            CreateButtonGrid(panel,board);
+            board = InitializeBoard(row, col, minesNumber);
+            panel1.AutoScroll = true;
+            panel1.Size = new Size((buttonSize + padding) * col, (buttonSize + padding) * row);
+            this.Controls.Add(panel1);
+
+
+            CreateButtonGrid(panel1,board);
+            timer1.Enabled = true;
         }
-        private void CreateButtonGrid(Panel panel,int[,] board)
+        private void CreateButtonGrid(Panel panel1,int[,] board)
         {
             for (int i = 0; i < row; i++)
             {
@@ -44,59 +42,75 @@ namespace WindowsFormsApp1
                     {
                         Size = new System.Drawing.Size(buttonSize, buttonSize),
                         Location = new System.Drawing.Point(j * (buttonSize + padding), i * (buttonSize + padding)),
-                        Tag = new { Row = i, Col = j, minenumber=board[i, j] ,flag=0} // 存儲行列信息
+                        Tag = new ButtonTag
+                        {
+                            Row = i,
+                            Col = j,
+                            MineNumber = board[i, j], 
+                            Flag = 0 
+                        }
                     };
 
-                    // 註冊點擊事件處理程序
-                    button.MouseClick += Button_Click;
-                    panel.Controls.Add(button);
+                    button.MouseDown += Button_Click;
+                    panel1.Controls.Add(button);
                 }
             }
         }
 
-        // 按鈕點擊事件處理程序
         private void Button_Click(object sender, MouseEventArgs e)
         {
-            Button button = sender as Button; // 確保 sender 是 Button 類型
-            var tag = (dynamic)button.Tag;
-            if (button != null && ((dynamic)button.Tag).flag == 0)
+            Button button = sender as Button; 
+            if (button != null)
             {
-                if (e.Button == MouseButtons.Left)
+               
+                ButtonTag tag = (ButtonTag)button.Tag;
+
+                if (e.Button == MouseButtons.Left && tag.Flag == 0)
                 {
-                    if (tag.minenumber == 9)
+                    if (tag.MineNumber == 9)
                     {
-                        MessageBox.Show($"game over");
+                        MessageBox.Show($"Game over");
                     }
                     else
                     {
-                        button.Text = $"{tag.minenumber}";
-                        button.Font = new Font(button.Font.FontFamily, 16, FontStyle.Bold);
-                        button.ForeColor = Color.Red;
-                        button.Enabled = false;
+                        OpenButton(button);
+
+                        
+                        if (tag.MineNumber == 0)
+                        {
+                            OpenSurroundingButtons(tag.Row, tag.Col);
+                        }
+                        if (CheckVictory())
+                        {
+                            timer1.Enabled = false;
+                            MessageBox.Show($"過關，使用{label1.Text}秒");
+                        }
                     }
                 }
                 else if (e.Button == MouseButtons.Right)
                 {
-                    if (button.Text== "🚩")
+                    if (button.Text == "🚩")
                     {
-                        button.Text = " ";
-                        ((dynamic)button.Tag).flag = 0;
+                        button.Text = string.Empty;
+                        tag.Flag = 0; 
                     }
-                    else if (button.Text == "")
+                    else if (string.IsNullOrEmpty(button.Text))
                     {
-                        button.Text = "🚩";
-                        ((dynamic)button.Tag).flag = 1;
+                        button.Text = "🚩"; 
+                        tag.Flag = 1; 
                     }
+
+                    button.Tag = tag;
                 }
             }
         }
 
-    private int[,] InitializeBoard(int row, int col, int minesNumber)
+
+        private int[,] InitializeBoard(int row, int col, int minesNumber)
         {
             List<int> mines = GetRandomNumbers(row * col, minesNumber);
             int[,] board = new int[row, col];
 
-            // 佈置地雷
             foreach (var mine in mines)
             {
                 int mine_row = mine % row;
@@ -104,19 +118,17 @@ namespace WindowsFormsApp1
                 board[mine_row, mine_col] = 9;
             }
 
-            // 計算地雷數量
             int[,] directions = { { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 }, { -1, -1 }, { -1, 1 }, { 1, -1 }, { 1, 1 } };
             for (int i = 0; i < row; i++)
             {
                 for (int j = 0; j < col; j++)
                 {
-                    if (board[i, j] == 9) continue;  // 如果這個位置是地雷，跳過
+                    if (board[i, j] == 9) continue;  
                     for (int k = 0; k < directions.GetLength(0); k++)
                     {
                         int newRow = i + directions[k, 0];
                         int newCol = j + directions[k, 1];
 
-                        // 檢查邊界條件
                         if (newRow >= 0 && newRow < row && newCol >= 0 && newCol < col && board[newRow, newCol] == 9)
                         {
                             board[i, j]++;
@@ -127,6 +139,67 @@ namespace WindowsFormsApp1
 
             return board;
         }
+
+        private void OpenButton(Button button)
+        {
+            ButtonTag tag = (ButtonTag)button.Tag;
+            if (!button.Enabled) return; 
+
+            button.Text = tag.MineNumber == 0 ? string.Empty : tag.MineNumber.ToString();
+            button.Font = new Font(button.Font.FontFamily, 16, FontStyle.Bold);
+            button.ForeColor = Color.Red;
+            button.Enabled = false;
+        }
+
+        private void OpenSurroundingButtons(int row, int col)
+        {
+            int[,] directions = {
+        { -1, 0 }, { 1, 0 }, { 0, -1 }, { 0, 1 },
+        { -1, -1 }, { -1, 1 }, { 1, -1 }, { 1, 1 }
+    };
+
+            for (int i = 0; i < directions.GetLength(0); i++)
+            {
+                int newRow = row + directions[i, 0];
+                int newCol = col + directions[i, 1];
+
+                if (newRow >= 0 && newRow < this.row && newCol >= 0 && newCol < this.col)
+                {
+                    foreach (Button btn in panel1.Controls) 
+                    {
+                        ButtonTag btnTag = (ButtonTag)btn.Tag;
+                        if (btnTag.Row == newRow && btnTag.Col == newCol && btn.Enabled)
+                        {
+                            OpenButton(btn);
+
+                            if (btnTag.MineNumber == 0)
+                            {
+                                OpenSurroundingButtons(newRow, newCol);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        private bool CheckVictory()
+        {
+            foreach (Control control in this.panel1.Controls) 
+            {
+                Button button = control as Button;
+                if (button != null)
+                {
+                    ButtonTag tag = (ButtonTag)button.Tag;
+
+                    if (button.Enabled && tag.Flag == 0)
+                    {
+                        return false;
+                    }
+
+                }
+            }
+            return true; 
+        }
+
 
         private List<int> GetRandomNumbers(int n, int k)
         {
@@ -143,10 +216,19 @@ namespace WindowsFormsApp1
 
             return randomNumbers;
         }
-
-        private void label1_Click(object sender, EventArgs e)
+        public class ButtonTag
         {
-
+            public int Row { get; set; }
+            public int Col { get; set; }
+            public int MineNumber { get; set; }
+            public int Flag { get; set; }
         }
+
+        private void timer1_Tick(object sender, EventArgs e)
+        {
+            int num = Convert.ToInt32(label1.Text)+1;
+            label1.Text = num.ToString();
+        }
+
     }
 }
